@@ -1,0 +1,118 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres:16
+    container_name: mercury-postgres
+    environment:
+      POSTGRES_PASSWORD: "postpass"
+      POSTGRES_USER: postuser
+      POSTGRES_DB: mercury
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mercury-net
+
+  redis:
+    image: redis:7.2
+    container_name: mercury-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mercury-net
+    volumes:
+      - redisdata:/data
+
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: mercury-kafka
+    ports:
+      - "9092:9092" #clients on host
+      - "9093:9093" #controller
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      KAFKA_NUM_PARTITIONS: "3"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+
+    networks:
+      - mercury-net
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    container_name: mercury-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./infra/otel/collector-config.yml:/etc/otelcol/config.yml:ro
+    ports:
+      - "4317:4317" # apps -> collector (OTLP gRPC)
+      - "4318:4318" # apps -> collector (OTLP HTTP)
+      - "8889:8889" # prometheus scrape endpoint (collector exporter)
+    networks: [mercury-net]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: mercury-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+    networks: [mercury-net]
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: mercury-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [mercury-net]
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: mercury-grafana
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+
+    networks:
+      - mercury-net
+
+volumes:
+  pgdata:
+  redisdata:
+  kafkadata:
+  grafana-data:
+
+networks:
+  mercury-net:
+    driver: bridge
