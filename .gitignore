@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Python ###
+performance-scripts/venv/
+__pycache__/
+*.pyc

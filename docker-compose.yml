@@ -143,6 +143,7 @@ services:
       OTEL_LOG_LEVEL: "info"
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
+      SPRING_PROFILES_ACTIVE: dev
     volumes:
       - "$PWD/infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro"
 
