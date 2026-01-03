@@ -10,3 +10,8 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["mercury-catalog-service:8080"]
+
+  - job_name: "mercury-order-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["mercury-order-service:8080"]
