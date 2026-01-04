@@ -1,0 +1,266 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["mercury"],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "custom",
+        "label": "Service (cAdvisor)",
+        "hide": 0,
+        "query": "mercury-order-service,mercury-catalog-service,mercury-postgres",
+        "current": { "text": "mercury-order-service", "value": "mercury-order-service" }
+      },
+      {
+        "name": "app",
+        "type": "custom",
+        "label": "Application (micrometer label)",
+        "hide": 0,
+        "query": "mercury-order-service,mercury-catalog-service",
+        "current": { "text": "mercury-order-service", "value": "mercury-order-service" }
+      }
+    ]
+  },
+  "time": { "from": "now-15m", "to": "now" },
+  "timezone": "browser",
+  "title": "Mercury — Real-time Overview (Infra + Postgres + Services)",
+  "version": 2,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP RPS (all endpoints) — by application",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (application)",
+          "legendFormat": "{{application}} rps"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Order latency (ms) — /api/v1/orders (p50/p95/p99)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/orders.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p50 ms"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/orders.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p95 ms"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/orders.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p99 ms"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "HTTP error rate (%) — 5xx / total (status OR outcome)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * ((sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[1m])) by (application)) or (sum(rate(http_server_requests_seconds_count{outcome=\"SERVER_ERROR\"}[1m])) by (application))) / sum(rate(http_server_requests_seconds_count[1m])) by (application)",
+          "legendFormat": "{{application}} 5xx %"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Tomcat busy threads — $app",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "max(tomcat_threads_busy{application=\"$app\"})", "legendFormat": "busy" },
+        { "refId": "B", "expr": "max(tomcat_threads_config_max{application=\"$app\"})", "legendFormat": "max" }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Hikari connections — $app",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "max(hikaricp_connections_active{application=\"$app\"})", "legendFormat": "active" },
+        { "refId": "B", "expr": "max(hikaricp_connections_idle{application=\"$app\"})", "legendFormat": "idle" },
+        { "refId": "C", "expr": "max(hikaricp_connections_pending{application=\"$app\"})", "legendFormat": "pending" }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "JVM heap used (MB) — $app",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{application=\"$app\", area=\"heap\"}) / 1024 / 1024",
+          "legendFormat": "heap used MB"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "JVM CPU (process) — $app",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "max(process_cpu_usage{application=\"$app\"}) * 100", "legendFormat": "process cpu %" }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Container CPU (cores) — $service (cAdvisor)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m])))",
+          "legendFormat": "$service cpu cores"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Container memory (MB) — $service (cAdvisor)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "((sum(container_memory_working_set_bytes{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}) or sum(container_memory_working_set_bytes{job=\"cadvisor\", name=~\".*$service.*\"}) or sum(container_memory_working_set_bytes{job=\"cadvisor\", container=~\".*$service.*\"})) / 1024 / 1024)",
+          "legendFormat": "$service working set MB"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Container network in/out (MB/s) — $service (cAdvisor)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "((sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "legendFormat": "rx MB/s"
+        },
+        {
+          "refId": "B",
+          "expr": "((sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "legendFormat": "tx MB/s"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Container disk IO read/write (MB/s) — $service (cAdvisor)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "((sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "legendFormat": "read MB/s"
+        },
+        {
+          "refId": "B",
+          "expr": "((sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "legendFormat": "write MB/s"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Postgres TPS (commits+rollbacks/s)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"mercury\"}[1m])) + sum(rate(pg_stat_database_xact_rollback{datname=\"mercury\"}[1m]))",
+          "legendFormat": "tps"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Postgres connections (active/idle)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "pg_stat_activity_count{datname=\"mercury\", state=\"active\"}", "legendFormat": "active" },
+        { "refId": "B", "expr": "pg_stat_activity_count{datname=\"mercury\", state=\"idle\"}", "legendFormat": "idle" }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Postgres cache hit ratio (%)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(rate(pg_stat_database_blks_hit{datname=\"mercury\"}[5m])) / (sum(rate(pg_stat_database_blks_hit{datname=\"mercury\"}[5m])) + sum(rate(pg_stat_database_blks_read{datname=\"mercury\"}[5m]))))",
+          "legendFormat": "cache hit %"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Postgres locks + deadlocks",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "sum(pg_locks_count{datname=\"mercury\"})", "legendFormat": "locks" },
+        { "refId": "B", "expr": "sum(rate(pg_stat_database_deadlocks{datname=\"mercury\"}[1m]))", "legendFormat": "deadlocks/s" }
+      ]
+    }
+  ]
+}

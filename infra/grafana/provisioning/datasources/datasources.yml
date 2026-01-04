@@ -7,16 +7,12 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
 
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+
   - name: Jaeger
     type: jaeger
     access: proxy
     url: http://jaeger:16686
-
-  - name: mercury
-    orgId: 1
-    folder: "Mercury"
-    type: file
-    disableDeletion: false
-    editable: true
-    options:
-      path: /etc/grafana/provisioning/dashboards

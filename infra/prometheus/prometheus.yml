@@ -1,17 +1,40 @@
 global:
   scrape_interval: 5s
+  evaluation_interval: 5s
 
 scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
   - job_name: "otel-collector"
     static_configs:
       - targets: ["otel-collector:8889"]
 
+  # Spring Boot apps (Micrometer / Actuator)
   - job_name: "mercury-catalog-service"
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["mercury-catalog-service:8080"]
+    relabel_configs:
+      # Add a stable label: application=<job_name> (used by Grafana dashboards)
+      - source_labels: [job]
+        target_label: application
 
   - job_name: "mercury-order-service"
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["mercury-order-service:8080"]
+    relabel_configs:
+      - source_labels: [job]
+        target_label: application
+
+  # Container-level metrics
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # Postgres exporter
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]

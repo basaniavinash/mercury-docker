@@ -84,6 +84,10 @@ services:
     restart: unless-stopped
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
     ports:
       - "9090:9090"
     networks: [mercury-net]
@@ -92,26 +96,29 @@ services:
     image: grafana/grafana:11.0.0
     container_name: mercury-grafana
     restart: unless-stopped
-
     ports:
       - "3000:3000"
-
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
-
     volumes:
       - grafana-data:/var/lib/grafana
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-
-    networks:
-      - mercury-net
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+      - jaeger
+    networks: [mercury-net]
 
   loki:
     image: grafana/loki:2.9.6
     container_name: mercury-loki
-    command: -config.file=/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ./infra/loki/config.yml:/etc/loki/config.yml:ro
+      - lokidata:/loki
     ports:
       - "3100:3100"
     networks: [mercury-net]
@@ -123,8 +130,36 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./infra/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - promtail-positions:/tmp
     command: -config.file=/etc/promtail/config.yml
     networks: [mercury-net]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: mercury-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8085:8080" # host:container (cadvisor UI, Prom scrape)
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [mercury-net]
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: mercury-postgres-exporter
+    restart: unless-stopped
+    env_file:
+      - ./infra/postgres-exporter/postgres_exporter.env
+    ports:
+      - "9187:9187"
+    networks: [mercury-net]
+    depends_on:
+      - postgres
 
   mercury-catalog-service:
     image: mercury-catalog-service:latest
@@ -144,8 +179,10 @@ services:
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
       SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      - postgres
     volumes:
-      - "$PWD/infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro"
+      - ./infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
 
   mercury-order-service:
     image: mercury-order-service:latest
@@ -165,14 +202,19 @@ services:
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
       SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      - mercury-catalog-service
     volumes:
-      - "$PWD/infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro"
+      - ./infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
 
 volumes:
   pgdata:
   redisdata:
   kafkadata:
   grafana-data:
+  promdata:
+  lokidata:
+  promtail-positions:
 
 networks:
   mercury-net:
