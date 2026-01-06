@@ -62,6 +62,7 @@ services:
     command: ["--config=/etc/otelcol/config.yml"]
     volumes:
       - ./infra/otel/collector-config.yml:/etc/otelcol/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "4317:4317" # apps -> collector (OTLP gRPC)
       - "4318:4318" # apps -> collector (OTLP HTTP)
@@ -160,6 +161,17 @@ services:
     networks: [mercury-net]
     depends_on:
       - postgres
+
+  nginx:
+    image: nginx:stable
+    container_name: mercury-reverse-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/:/etc/nginx
+    networks:
+      - mercury-net
 
   mercury-catalog-service:
     image: mercury-catalog-service:latest

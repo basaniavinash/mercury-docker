@@ -6,6 +6,10 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 5s
+
 processors:
   memory_limiter:
     check_interval: 1s
@@ -32,6 +36,6 @@ service:
       exporters: [otlp/jaeger]
 
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, docker_stats]
       processors: [memory_limiter, batch]
       exporters: [prometheus]
