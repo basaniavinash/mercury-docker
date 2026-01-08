@@ -17,7 +17,6 @@ scrape_configs:
     static_configs:
       - targets: ["mercury-catalog-service:8080"]
     relabel_configs:
-      # Add a stable label: application=<job_name> (used by Grafana dashboards)
       - source_labels: [job]
         target_label: application
 
@@ -29,7 +28,7 @@ scrape_configs:
       - source_labels: [job]
         target_label: application
 
-  # Container-level metrics
+  # Container metrics via cAdvisor (Docker API mode)
   - job_name: "cadvisor"
     static_configs:
       - targets: ["cadvisor:8080"]

@@ -1,0 +1,22 @@
+// ---- Send scraped metrics into Prometheus via remote_write ----
+prometheus.remote_write "to_prometheus" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ---- Embedded cAdvisor exporter (inside Alloy) ----
+// This talks to Docker via docker.sock and can attach container labels.
+// Those labels include com.docker.compose.service etc.
+prometheus.exporter.cadvisor "cadvisor" {
+  docker_host = "unix:///var/run/docker.sock"
+}
+
+// ---- Scrape the embedded exporter and remote_write to Prometheus ----
+prometheus.scrape "cadvisor" {
+  targets    = prometheus.exporter.cadvisor.cadvisor.targets
+  forward_to = [prometheus.remote_write.to_prometheus.receiver]
+
+  scrape_interval = "10s"
+  scrape_timeout  = "8s"
+}

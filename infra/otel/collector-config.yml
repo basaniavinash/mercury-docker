@@ -8,7 +8,12 @@ receivers:
 
   docker_stats:
     endpoint: unix:///var/run/docker.sock
-    collection_interval: 5s
+    collection_interval: 10s
+    timeout: 10s
+    container_labels_to_metric_labels:
+      com.docker.compose.service: compose_service
+      com.docker.compose.project: compose_project
+      com.docker.compose.container-number: compose_container_number
 
 processors:
   memory_limiter:

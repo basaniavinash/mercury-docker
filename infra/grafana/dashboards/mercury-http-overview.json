@@ -13,7 +13,7 @@
       {
         "name": "service",
         "type": "custom",
-        "label": "Service (cAdvisor)",
+        "label": "Service (Docker/Alloy)",
         "hide": 0,
         "query": "mercury-order-service,mercury-catalog-service,mercury-postgres",
         "current": { "text": "mercury-order-service", "value": "mercury-order-service" }
@@ -98,7 +98,7 @@
         {
           "refId": "A",
           "expr": "100 * ((sum(rate(http_server_requests_seconds_count{status=~\"4..\"}[1m])) by (application)) or (sum(rate(http_server_requests_seconds_count{outcome=\"CLIENT_ERROR\"}[1m])) by (application))) / sum(rate(http_server_requests_seconds_count[1m])) by (application)",
-          "legendFormat": "{{application}} 5xx %"
+          "legendFormat": "{{application}} 4xx %"
         }
       ]
     },
@@ -156,14 +156,14 @@
 
     {
       "type": "timeseries",
-      "title": "Container CPU (cores) — $service (cAdvisor)",
+      "title": "Container CPU (cores) — $service (Alloy/Docker)",
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m])))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{cpu=\"total\", name=~\".*$service.*\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{cpu=\"total\", container=~\".*$service.*\"}[1m])) or sum(rate(container_cpu_usage_seconds_total{cpu=\"total\", container_name=~\".*$service.*\"}[1m]))",
           "legendFormat": "$service cpu cores"
         }
       ]
@@ -171,14 +171,14 @@
 
     {
       "type": "timeseries",
-      "title": "Container memory (MB) — $service (cAdvisor)",
+      "title": "Container memory (MB) — $service (Alloy/Docker)",
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
           "refId": "A",
-          "expr": "((sum(container_memory_working_set_bytes{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}) or sum(container_memory_working_set_bytes{job=\"cadvisor\", name=~\".*$service.*\"}) or sum(container_memory_working_set_bytes{job=\"cadvisor\", container=~\".*$service.*\"})) / 1024 / 1024)",
+          "expr": "((sum(container_memory_working_set_bytes{name=~\".*$service.*\"}) or sum(container_memory_working_set_bytes{container=~\".*$service.*\"}) or sum(container_memory_working_set_bytes{container_name=~\".*$service.*\"})) / 1024 / 1024)",
           "legendFormat": "$service working set MB"
         }
       ]
@@ -186,19 +186,19 @@
 
     {
       "type": "timeseries",
-      "title": "Container network in/out (MB/s) — $service (cAdvisor)",
+      "title": "Container network in/out (MB/s) — $service (Alloy/Docker)",
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
           "refId": "A",
-          "expr": "((sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_receive_bytes_total{job=\"cadvisor\", interface!=\"lo\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "expr": "((sum(rate(container_network_receive_bytes_total{interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_receive_bytes_total{interface!=\"lo\", container=~\".*$service.*\"}[1m])) or sum(rate(container_network_receive_bytes_total{interface!=\"lo\", container_name=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
           "legendFormat": "rx MB/s"
         },
         {
           "refId": "B",
-          "expr": "((sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\", interface!=\"lo\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "expr": "((sum(rate(container_network_transmit_bytes_total{interface!=\"lo\", name=~\".*$service.*\"}[1m])) or sum(rate(container_network_transmit_bytes_total{interface!=\"lo\", container=~\".*$service.*\"}[1m])) or sum(rate(container_network_transmit_bytes_total{interface!=\"lo\", container_name=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
           "legendFormat": "tx MB/s"
         }
       ]
@@ -206,19 +206,19 @@
 
     {
       "type": "timeseries",
-      "title": "Container disk IO read/write (MB/s) — $service (cAdvisor)",
+      "title": "Container disk IO read/write (MB/s) — $service (Alloy/Docker)",
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
           "refId": "A",
-          "expr": "((sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "expr": "((sum(rate(container_fs_reads_bytes_total{name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_reads_bytes_total{container=~\".*$service.*\"}[1m])) or sum(rate(container_fs_reads_bytes_total{container_name=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
           "legendFormat": "read MB/s"
         },
         {
           "refId": "B",
-          "expr": "((sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", container_label_com_docker_compose_service=\"$service\"}[1m])) or sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\", container=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
+          "expr": "((sum(rate(container_fs_writes_bytes_total{name=~\".*$service.*\"}[1m])) or sum(rate(container_fs_writes_bytes_total{container=~\".*$service.*\"}[1m])) or sum(rate(container_fs_writes_bytes_total{container_name=~\".*$service.*\"}[1m]))) / 1024 / 1024)",
           "legendFormat": "write MB/s"
         }
       ]

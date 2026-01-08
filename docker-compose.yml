@@ -56,6 +56,7 @@ services:
       - kafkadata:/var/lib/kafka/data
 
   otel-collector:
+    user: "0:0"
     image: otel/opentelemetry-collector-contrib:0.97.0
     container_name: mercury-otel-collector
     restart: unless-stopped
@@ -68,6 +69,26 @@ services:
       - "4318:4318" # apps -> collector (OTLP HTTP)
       - "8889:8889" # prometheus scrape endpoint (collector exporter)
     networks: [mercury-net]
+
+  alloy:
+    image: grafana/alloy:v1.4.2
+    container_name: mercury-alloy
+    restart: unless-stopped
+    user: "0:0"
+    command:
+      [
+        "run",
+        "--server.http.listen-addr=0.0.0.0:12345",
+        "/etc/alloy/config.alloy",
+      ]
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [mercury-net]
+    depends_on:
+      - prometheus
 
   jaeger:
     image: jaegertracing/all-in-one:1.54
@@ -89,8 +110,26 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=2d
+      - --web.enable-remote-write-receiver
     ports:
       - "9090:9090"
+    networks: [mercury-net]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: mercury-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    # IMPORTANT: on Mac, do NOT mount /sys, /var/lib/docker, /rootfs — those cause "root-only" view.
+    # Instead use Docker API only.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=5s
+      - --store_container_labels=true
+      - --whitelisted_container_labels=com.docker.compose.service,com.docker.compose.project,com.docker.compose.container-number
     networks: [mercury-net]
 
   grafana:
@@ -133,21 +172,6 @@ services:
       - ./infra/promtail/promtail.yml:/etc/promtail/config.yml:ro
       - promtail-positions:/tmp
     command: -config.file=/etc/promtail/config.yml
-    networks: [mercury-net]
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: mercury-cadvisor
-    restart: unless-stopped
-    privileged: true
-    ports:
-      - "8085:8080" # host:container (cadvisor UI, Prom scrape)
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
     networks: [mercury-net]
 
   postgres-exporter:
