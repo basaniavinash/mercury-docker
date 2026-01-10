@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryReserved v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "correlation_id",
+    "produced_at",
+    "event_type",
+    "schema_version",
+    "order_id",
+    "reservation_id",
+    "items"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "produced_at": { "type": "string", "format": "date-time" },
+    "event_type": { "const": "InventoryReserved" },
+    "schema_version": { "const": "v1" },
+
+    "order_id": { "type": "string" },
+    "reservation_id": { "type": "string" },
+
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sku", "qty"],
+        "properties": {
+          "sku": { "type": "string" },
+          "qty": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

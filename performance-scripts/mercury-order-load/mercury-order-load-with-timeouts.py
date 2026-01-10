@@ -2,7 +2,7 @@
 """
 mercury-order-load.py
 
-Correct async load test with *real* latency separation:
+Async load test with *real* latency separation:
 
 1) queue_wait_ms  - waiting for client concurrency slot
 2) pool_wait_ms   - waiting for a TCP connection from pool
@@ -11,6 +11,10 @@ Correct async load test with *real* latency separation:
 Derived:
 - request_latency_ms = pool_wait_ms + request_io_ms
 - total_ms           = queue_wait_ms + request_latency_ms
+
+Adds RANDOM MIX:
+- normal POST create order
+- slow GET /timeout to trigger gateway timeout behavior
 """
 
 import asyncio
@@ -20,21 +24,31 @@ import statistics
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 
 
 # ---------- Config ----------
 BASE_URL = os.getenv("ORDER_BASE_URL", "http://localhost").rstrip("/")
+
+# Gateway paths (your nginx routes /orders/* -> order-service)
 ORDER_PATH = os.getenv("ORDER_PATH", "/orders/api/v1/orders")
-TOTAL_REQUESTS = int(os.getenv("TOTAL_REQUESTS", "10000"))
-CONCURRENCY = int(os.getenv("CONCURRENCY", "150"))
+TIMEOUT_PATH = os.getenv("TIMEOUT_PATH", "/orders/api/v1/orders/timeout")
+
+TOTAL_REQUESTS = int(os.getenv("TOTAL_REQUESTS", "1000"))
+CONCURRENCY = int(os.getenv("CONCURRENCY", "10"))
 TIMEOUT_S = float(os.getenv("TIMEOUT_S", "10"))
+
+# Random mix: percentage of requests that hit TIMEOUT endpoint
+# Example: 5 means ~5% GET /timeout, 95% POST /orders
+TIMEOUT_PCT = float(os.getenv("TIMEOUT_PCT", "5.0"))
+
 QTY_MAX = int(os.getenv("QTY_MAX", "1"))
 MAX_ITEM_ID = int(os.getenv("MAX_ITEM_ID", "100000"))
 
-URL = f"{BASE_URL}{ORDER_PATH}"
+ORDER_URL = f"{BASE_URL}{ORDER_PATH}"
+TIMEOUT_URL = f"{BASE_URL}{TIMEOUT_PATH}"
 
 
 # ---------- Helpers ----------
@@ -129,6 +143,7 @@ def trace_config():
 # ---------- Result ----------
 @dataclass
 class Result:
+    kind: str                 # "ORDER_POST" or "TIMEOUT_GET"
     ok: bool
     status: Optional[int]
     queue_wait_ms: float
@@ -139,13 +154,28 @@ class Result:
     error: Optional[str]
 
 
+def choose_request() -> Tuple[str, str, str]:
+    """
+    Returns (kind, method, url)
+    """
+    r = random.random() * 100.0
+    if r < TIMEOUT_PCT:
+        return ("TIMEOUT_GET", "GET", TIMEOUT_URL)
+    return ("ORDER_POST", "POST", ORDER_URL)
+
+
 # ---------- Worker ----------
 async def worker(session: aiohttp.ClientSession, sem: asyncio.Semaphore) -> Result:
-    payload = make_order_payload()
+    kind, method, url = choose_request()
+
     headers = {
-        "Content-Type": "application/json",
         "X-Request-Id": f"load-{uuid.uuid4()}",
     }
+
+    payload = None
+    if method == "POST":
+        headers["Content-Type"] = "application/json"
+        payload = make_order_payload()
 
     q0 = time.perf_counter()
     try:
@@ -156,8 +186,12 @@ async def worker(session: aiohttp.ClientSession, sem: asyncio.Semaphore) -> Resu
             t = Timings()
             ctx = {"t": t}
 
-            async with session.post(URL, json=payload, headers=headers, trace_request_ctx=ctx) as resp:
-                await resp.read()
+            if method == "POST":
+                async with session.post(url, json=payload, headers=headers, trace_request_ctx=ctx) as resp:
+                    await resp.read()
+            else:
+                async with session.get(url, headers=headers, trace_request_ctx=ctx) as resp:
+                    await resp.read()
 
             pool_wait_ms = (
                 (t.conn_end - t.conn_start) * 1000.0
@@ -172,28 +206,43 @@ async def worker(session: aiohttp.ClientSession, sem: asyncio.Semaphore) -> Resu
             req_lat = pool_wait_ms + request_io_ms
             total = queue_wait_ms + req_lat
 
+            ok = 200 <= resp.status < 300
+
             return Result(
-                ok=200 <= resp.status < 300,
+                kind=kind,
+                ok=ok,
                 status=resp.status,
                 queue_wait_ms=queue_wait_ms,
                 pool_wait_ms=pool_wait_ms,
                 request_io_ms=request_io_ms,
                 request_latency_ms=req_lat,
                 total_ms=total,
-                error=None if resp.status < 300 else f"HTTP_{resp.status}",
+                error=None if ok else f"HTTP_{resp.status}",
             )
 
     except Exception as e:
         total = (time.perf_counter() - q0) * 1000.0
-        return Result(False, None, 0, 0, 0, 0, total, type(e).__name__)
+        return Result(
+            kind=kind,
+            ok=False,
+            status=None,
+            queue_wait_ms=0.0,
+            pool_wait_ms=0.0,
+            request_io_ms=0.0,
+            request_latency_ms=0.0,
+            total_ms=total,
+            error=type(e).__name__,
+        )
 
 
 # ---------- Runner ----------
 async def run():
-    print(f"Target:         {URL}")
+    print(f"ORDER_URL:      {ORDER_URL}")
+    print(f"TIMEOUT_URL:    {TIMEOUT_URL}")
     print(f"Total requests: {TOTAL_REQUESTS}")
     print(f"Concurrency:    {CONCURRENCY}")
     print(f"Timeout (sec):  {TIMEOUT_S}")
+    print(f"Timeout mix:    {TIMEOUT_PCT:.2f}% GET /timeout, {100.0 - TIMEOUT_PCT:.2f}% POST /orders")
     print("")
 
     sem = asyncio.Semaphore(CONCURRENCY)
@@ -213,32 +262,49 @@ async def run():
         tasks = [worker(session, sem) for _ in range(TOTAL_REQUESTS)]
         results = await asyncio.gather(*tasks)
 
-    ok = [r for r in results if r.ok]
-    fail = [r for r in results if not r.ok]
+    # Split by kind
+    order_results = [r for r in results if r.kind == "ORDER_POST"]
+    timeout_results = [r for r in results if r.kind == "TIMEOUT_GET"]
 
-    print("===== Load Test Results =====")
+    def summarize(group: List[Result], title: str):
+        ok = [r for r in group if r.ok]
+        fail = [r for r in group if not r.ok]
+
+        print(f"===== {title} =====")
+        print(f"Requests: {len(group)}")
+        print(f"Success:  {len(ok)}")
+        print(f"Failures: {len(fail)}")
+        print("")
+
+        print_stats([r.queue_wait_ms for r in ok], "QUEUE WAIT")
+        print()
+        print_stats([r.pool_wait_ms for r in ok], "POOL WAIT")
+        print()
+        print_stats([r.request_io_ms for r in ok], "REQUEST I/O")
+        print()
+        print_stats([r.total_ms for r in ok], "TOTAL")
+        print("")
+
+        if fail:
+            errors = {}
+            for r in fail:
+                errors[r.error] = errors.get(r.error, 0) + 1
+
+            print("Failures breakdown:")
+            for k, v in sorted(errors.items()):
+                print(f"  {k}: {v}")
+            print("")
+
+    print("===== OVERALL =====")
+    all_ok = [r for r in results if r.ok]
+    all_fail = [r for r in results if not r.ok]
     print(f"Total requests: {TOTAL_REQUESTS}")
-    print(f"Success:        {len(ok)}")
-    print(f"Failures:       {len(fail)}")
+    print(f"Success:        {len(all_ok)}")
+    print(f"Failures:       {len(all_fail)}")
     print("")
 
-    print_stats([r.queue_wait_ms for r in ok], "QUEUE WAIT")
-    print()
-    print_stats([r.pool_wait_ms for r in ok], "POOL WAIT")
-    print()
-    print_stats([r.request_io_ms for r in ok], "REQUEST I/O")
-    print()
-    print_stats([r.total_ms for r in ok], "TOTAL")
-    print("")
-
-    if fail:
-        errors = {}
-        for r in fail:
-            errors[r.error] = errors.get(r.error, 0) + 1
-
-        print("Failures breakdown:")
-        for k, v in sorted(errors.items()):
-            print(f"  {k}: {v}")
+    summarize(order_results, "ORDER_POST (POST /api/v1/orders)")
+    summarize(timeout_results, "TIMEOUT_GET (GET /api/v1/orders/timeout)")
 
 
 if __name__ == "__main__":

@@ -233,8 +233,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"mercury\"}[1m])) + sum(rate(pg_stat_database_xact_rollback{datname=\"mercury\"}[1m]))",
-          "legendFormat": "tps"
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"mercury\"}[1m]))",
+          "legendFormat": "commits"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pg_stat_database_xact_rollback{datname=\"mercury\"}[1m]))",
+          "legendFormat": "rollbacks"
         }
       ]
     },

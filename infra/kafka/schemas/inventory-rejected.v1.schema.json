@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryRejected v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "correlation_id",
+    "produced_at",
+    "event_type",
+    "schema_version",
+    "order_id",
+    "reason",
+    "failed_items"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "produced_at": { "type": "string", "format": "date-time" },
+    "event_type": { "const": "InventoryRejected" },
+    "schema_version": { "const": "v1" },
+
+    "order_id": { "type": "string" },
+
+    "reason": {
+      "type": "string",
+      "enum": [
+        "OUT_OF_STOCK",
+        "INSUFFICIENT_QUANTITY",
+        "SKU_NOT_FOUND",
+        "INVENTORY_SERVICE_ERROR"
+      ]
+    },
+
+    "failed_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sku", "requested_qty", "available_qty"],
+        "properties": {
+          "sku": { "type": "string" },
+          "requested_qty": { "type": "integer", "minimum": 1 },
+          "available_qty": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

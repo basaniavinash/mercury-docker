@@ -105,3 +105,9 @@ ALTER ROLE flyway_user IN DATABASE mercury SET search_path = mercury, public;
 ALTER ROLE catalog_service IN DATABASE mercury SET search_path = mercury, public;
 ALTER ROLE order_service IN DATABASE mercury SET search_path = mercury, public;
 ALTER ROLE admin IN DATABASE mercury SET search_path = mercury, public;
+
+-- ------------------------------------------------------------------------------------
+-- 6) TIMEOUTS: set timeouts per role
+-- ------------------------------------------------------------------------------------
+ALTER ROLE order_service IN DATABASE mercury SET statement_timeout = '4s';
+ALTER ROLE catalog_service IN DATABASE mercury SET statement_timeout = '2s';

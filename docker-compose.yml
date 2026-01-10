@@ -49,11 +49,23 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
 
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
-
     networks:
       - mercury-net
     volumes:
       - kafkadata:/var/lib/kafka/data
+      - ./infra/kafka:/var/kafka:ro
+
+  kafka-init:
+    image: apache/kafka:3.8.0
+    container_name: mercury-kafka-init
+    depends_on:
+      - kafka
+    networks: [mercury-net]
+    volumes:
+      - ./infra/kafka:/var/kafka:ro
+    entrypoint: ["/bin/bash", "-lc"]
+    command: "bash /var/kafka/init-kafka.sh"
+    restart: "no"
 
   otel-collector:
     user: "0:0"
@@ -242,6 +254,7 @@ services:
       - mercury-catalog-service
     volumes:
       - ./infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+      - ./infra/kafka/schemas:/schemas:ro
 
 volumes:
   pgdata:
