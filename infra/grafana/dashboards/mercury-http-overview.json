@@ -15,7 +15,7 @@
         "type": "custom",
         "label": "Service (Docker/Alloy)",
         "hide": 0,
-        "query": "mercury-order-service,mercury-catalog-service,mercury-postgres",
+        "query": "mercury-order-service,mercury-catalog-service,mercury-postgres,mercury-payment-service",
         "current": { "text": "mercury-order-service", "value": "mercury-order-service" }
       },
       {
@@ -23,7 +23,7 @@
         "type": "custom",
         "label": "Application (micrometer label)",
         "hide": 0,
-        "query": "mercury-order-service,mercury-catalog-service",
+        "query": "mercury-order-service,mercury-catalog-service,mercury-payment-service",
         "current": { "text": "mercury-order-service", "value": "mercury-order-service" }
       }
     ]
@@ -50,9 +50,34 @@
 
     {
       "type": "timeseries",
+      "title": "Catalog latency (ms) — /api/v1/items (p50/p95/p99)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/items.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p50 ms"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/items.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p95 ms"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"$app\", uri=~\"/api/v1/items.*\"}[1m])) by (le)) * 1000",
+          "legendFormat": "p99 ms"
+        }
+      ]
+    },
+
+    {
+      "type": "timeseries",
       "title": "Order latency (ms) — /api/v1/orders (p50/p95/p99)",
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {

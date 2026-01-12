@@ -24,6 +24,7 @@ services:
       - mercury-net
     volumes:
       - redisdata:/data
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf
 
   kafka:
     image: apache/kafka:3.8.0
@@ -250,8 +251,28 @@ services:
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
       SPRING_PROFILES_ACTIVE: dev
-    depends_on:
-      - mercury-catalog-service
+    volumes:
+      - ./infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+      - ./infra/kafka/schemas:/schemas:ro
+
+  mercury-payment-service:
+    image: mercury-payment-service:latest
+    container_name: mercury-payment-service
+    ports:
+      - "8082:8080"
+    networks:
+      - mercury-net
+    environment:
+      # If you later add OTEL metrics/traces export:
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar"
+      OTEL_SERVICE_NAME: "mercury-payment-service"
+      OTEL_TRACES_EXPORTER: "otlp"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_LOG_LEVEL: "info"
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      SPRING_PROFILES_ACTIVE: dev
     volumes:
       - ./infra/otel/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
       - ./infra/kafka/schemas:/schemas:ro

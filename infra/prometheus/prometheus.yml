@@ -28,6 +28,14 @@ scrape_configs:
       - source_labels: [job]
         target_label: application
 
+  - job_name: "mercury-payments-service"
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets: ["mercury-payments-service:8080"]
+    relabel_configs:
+      - source_labels: [job]
+        target_label: application
+
   # Container metrics via cAdvisor (Docker API mode)
   - job_name: "cadvisor"
     static_configs:

@@ -17,7 +17,7 @@
     "event_id": { "type": "string", "format": "uuid" },
     "correlation_id": { "type": "string", "format": "uuid" },
     "produced_at": { "type": "string", "format": "date-time" },
-    "event_type": { "const": "InventoryRejected" },
+    "event_type": "INVENTORY_REJECTED",
     "schema_version": { "const": "v1" },
 
     "order_id": { "type": "string" },
