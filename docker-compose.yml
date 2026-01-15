@@ -208,6 +208,23 @@ services:
     volumes:
       - ./infra/nginx/:/etc/nginx
     networks:
+      mercury-net:
+        aliases:
+          - auth.mercury.local
+          - api.mercury.local
+          - grafana.mercury.local
+          - prom.mercury.local
+
+  dns:
+    image: coredns/coredns:1.11.1
+    container_name: mercury-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./infra/dns/Corefile:/etc/coredns/Corefile:ro
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    networks:
       - mercury-net
 
   keycloak-db:
@@ -236,6 +253,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
 
       # dev-friendly so you don't fight hostname issues
+      KC_HOSTNAME: "auth.mercury.local"
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_PROXY: "edge"
