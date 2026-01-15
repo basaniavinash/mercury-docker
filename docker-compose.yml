@@ -210,6 +210,41 @@ services:
     networks:
       - mercury-net
 
+  keycloak-db:
+    image: postgres:16
+    container_name: mercury-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloakdata:/var/lib/postgresql/data
+    networks: [mercury-net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: mercury-keycloak
+    depends_on: [keycloak-db]
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+
+      # dev-friendly so you don't fight hostname issues
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: "edge"
+    ports:
+      - "8088:8080" # Keycloak UI on http://localhost:8088
+    volumes:
+      - ./infra/keycloak/realm-mercury.json:/opt/keycloak/data/import/realm-mercury.json:ro
+    networks: [mercury-net]
+
   mercury-catalog-service:
     image: mercury-catalog-service:latest
     container_name: mercury-catalog-service
@@ -285,6 +320,7 @@ volumes:
   promdata:
   lokidata:
   promtail-positions:
+  keycloakdata:
 
 networks:
   mercury-net:
