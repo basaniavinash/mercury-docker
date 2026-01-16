@@ -1,0 +1,26 @@
+[req]
+default_bits       = 4096
+prompt             = no
+default_md         = sha256
+distinguished_name = dn
+x509_extensions    = v3_req
+
+[dn]
+C  = US
+ST = Local
+L  = Mercury
+O  = Mercury Lab
+OU = Dev
+CN = mercury.local
+
+[v3_req]
+subjectAltName = @alt_names
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+[alt_names]
+DNS.1 = mercury.local
+DNS.2 = auth.mercury.local
+DNS.3 = api.mercury.local
+DNS.4 = grafana.mercury.local
+DNS.5 = prometheus.mercury.local
