@@ -1,0 +1,26 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+nodes:
+  - role: control-plane
+
+    extraMounts:
+      # Mount the CA that signed your nginx cert into the node container
+      - hostPath: ./infra/nginx/certs/mercury-local.crt
+        containerPath: /etc/kubernetes/pki/mercury-local.crt
+
+    kubeadmConfigPatches:
+      - |
+        apiVersion: kubeadm.k8s.io/v1beta3
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            oidc-issuer-url: https://auth.mercury.local/realms/mercury
+            oidc-client-id: kubernetes
+            oidc-username-claim: preferred_username
+            oidc-groups-claim: groups
+            oidc-ca-file: /etc/kubernetes/pki/mercury-local.crt
+
+  - role: worker
+  - role: worker
+  - role: worker

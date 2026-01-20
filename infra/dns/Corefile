@@ -4,10 +4,10 @@ mercury.local:53 {
 
   hosts {
     127.0.0.1 auth.mercury.local
-    127.0.0.1 api.mercury.local
-    127.0.0.1 grafana.mercury.local
-    127.0.0.1 prom.mercury.local
-    127.0.0.1 jaeger.mercury.local
+    // 127.0.0.1 api.mercury.local
+    // 127.0.0.1 grafana.mercury.local
+    // 127.0.0.1 prom.mercury.local
+    // 127.0.0.1 jaeger.mercury.local
     fallthrough
   }
 }
